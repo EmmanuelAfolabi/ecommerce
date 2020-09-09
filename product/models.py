@@ -2,8 +2,15 @@ from django.db import models
 from django.conf import settings
 from django.utils.timezone import now
 from .managers import ProductManager
-from django.contrib.auth.models import  User
+from django.contrib.auth.models import User
+from django.shortcuts import reverse
 CURRENCY = settings.CURRENCY
+
+CATEGORY_CHOICES = {
+    ('gown', 'gown'),
+    ('bonnet', 'bonnet'),
+    ('short', 'short')
+}
 
 class Signup(models.Model):
     firstname = models.CharField(max_length=100)
@@ -47,23 +54,60 @@ class Order(models.Model):
         return total
 
 
+    @property
+    def shipping(self):
+        shipping = False
+        orderitems = self.orderitem_set.all()
+        for i in orderitems:
+            if i.product.digital == False:
+                shipping = True
+        return shipping
+
+
 
 class Product(models.Model):
-    active = models.BooleanField(default=True)
     name = models.CharField(max_length=150, null=True)
-    price = models.FloatField()
-    image = models.ImageField(null=True, blank=True)
+    price = models.DecimalField(max_digits=7, decimal_places=2)
+    digital = models.BooleanField(default=False, null=True, blank=False)
+    image1 = models.ImageField(null=True, blank=True)
+    image2 = models.ImageField(null=True, blank=True)
+    image3 = models.ImageField(null=True, blank=True)
+    category = models.CharField(choices=CATEGORY_CHOICES, null=False, max_length=30)
+    #slug = models.SlugField()
+
 
     def __str__(self):
         return self.name
 
     @property
-    def imageURL(self):
+    def image1URL(self):
         try:
-            url = self.image.url
+            url = self.image1.url
         except:
             url = ''
         return url
+
+    @property
+    def image2URL(self):
+        try:
+            url = self.image2.url
+        except:
+            url = ''
+        return url
+
+    @property
+    def image3URL(self):
+        try:
+            url = self.image3.url
+        except:
+            url = ''
+        return url
+
+    def get_absolute_url(self):
+        return reverse("product:detail", kwargs={
+            'slug':self.slug
+        })
+
 
 class OrderItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
@@ -82,12 +126,13 @@ class OrderItem(models.Model):
 class ShippingAddress(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True)
     order = models.ForeignKey(Order, on_delete=models.SET_NULL, null=True)
-    address = models.CharField(max_length=150, null=True)
-    city = models.CharField(max_length=150, null=True)
+    streetaddress = models.CharField(max_length=150, null=True)
+    apartmentaddress = models.CharField(max_length=150, null=True)
+    town = models.CharField(max_length=150, null=True)
     state = models.CharField(max_length=150, null=True)
     zipcode = models.CharField(max_length=150, null=True)
     date_added = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return self.address
+        return str(self.streetaddress)
 
