@@ -26,11 +26,11 @@ class Signup(models.Model):
 class Customer(models.Model):
     user = models.OneToOneField(User, on_delete=models.CASCADE, null=True)
     name = models.CharField(max_length=200, null=True)
+    phone = models.CharField(max_length=14, null=True)
     email = models.EmailField(max_length=200, null=True)
 
     def __str__(self):
         return self.name
-
 
 class Order(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True)
@@ -53,7 +53,6 @@ class Order(models.Model):
         total = sum([item.quantity for item in orderitems])
         return total
 
-
     @property
     def shipping(self):
         shipping = False
@@ -62,8 +61,6 @@ class Order(models.Model):
             if i.product.digital == False:
                 shipping = True
         return shipping
-
-
 
 class Product(models.Model):
     name = models.CharField(max_length=150, null=True)
@@ -105,9 +102,8 @@ class Product(models.Model):
 
     def get_absolute_url(self):
         return reverse("product:detail", kwargs={
-            'slug':self.slug
+            'slug': self.slug
         })
-
 
 class OrderItem(models.Model):
     product = models.ForeignKey(Product, on_delete=models.SET_NULL, null=True)
@@ -119,9 +115,10 @@ class OrderItem(models.Model):
     @property
     def get_total(self):
         total = self.product.price * self.quantity
-        return total
+        return total\
 
-
+    def __str__(self):
+        return 'Order : ' + str(self.order), str(self.product), str(self.quantity)
 
 class ShippingAddress(models.Model):
     customer = models.ForeignKey(Customer, on_delete=models.SET_NULL, null=True, blank=True)
@@ -134,5 +131,11 @@ class ShippingAddress(models.Model):
     date_added = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
-        return str(self.streetaddress)
+        return 'Order: ' + str(self.order), str(self.streetaddress), \
+               str(self.apartmentaddress), str(self.town), str(self.state)
 
+class Subscriber(models.Model):
+    email = models.EmailField(max_length=100)
+
+    def __str__(self):
+        return self.email

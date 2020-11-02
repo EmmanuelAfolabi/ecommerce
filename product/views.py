@@ -21,20 +21,17 @@ from django.contrib.auth.decorators import login_required
 #from django.core.mmail import send_mail, BadHeaderError
 import json
 import datetime
+from .utils import cookieCart, cartData, guestOrder
 
 def secondindex(request):
     return render(request, 'index11.html')
 
+
 def detail(request, pk):
-    if request.user.is_authenticated:
-        customer = request.user.customer
-        order, created = Order.objects.get_or_create(customer=customer, complete=False)
-        items = order.orderitem_set.all()
-        cartItems = order.get_cart_items
-    else:
-        items = []
-        order = {'get_cart_total': 0, 'get_cart_items': 0, "shipping": False}
-        cartItems = order['get_cart_items']
+    data = cartData(request)
+    cartItems = data['cartItems']
+    order = data['order']
+    items = data['items']
 
     products = Product.objects.filter(id=pk)
     context = {'products': products, 'items': items, 'order': order, 'cartItems': cartItems}
@@ -42,49 +39,32 @@ def detail(request, pk):
 
 
 def index(request):
-    if request.user.is_authenticated:
-        customer = request.user.customer
-        order, created = Order.objects.get_or_create(customer=customer, complete=False)
-        items = order.orderitem_set.all()
-        cartItems = order.get_cart_items
-    else:
-        items = []
-        order = {'get_cart_total': 0, 'get_cart_items': 0, "shipping": False}
-        cartItems = order['get_cart_items']
+    data = cartData(request)
+    cartItems = data['cartItems']
 
     products = Product.objects.all()
-    context = {'products': products, 'items': items, 'order': order, 'cartItems': cartItems}
+    context = {'products': products, 'cartItems': cartItems}
     return render(request, 'index.html', context)
 
-def cart(request):
-    if request.user.is_authenticated:
-        customer = request.user.customer
-        order, created = Order.objects.get_or_create(customer=customer, complete=False)
-        items = order.orderitem_set.all()
-        cartItems = order.get_cart_items
 
-    else:
-        items = []
-        order = {'get_cart_total': 0, 'get_cart_items': 0, "shipping": False}
-        cartItems = order['get_cart_items']
+def cart(request):
+    data = cartData(request)
+    cartItems = data['cartItems']
+    order = data['order']
+    items = data['items']
 
     context = {'items': items, 'order': order, 'cartItems': cartItems}
     return render(request, 'shop-cart.html', context)
 
 def checkout(request):
-    if request.user.is_authenticated:
-        customer = request.user.customer
-        order, created = Order.objects.get_or_create(customer=customer, complete=False)
-        items = order.orderitem_set.all()
-        cartItems = order.get_cart_items
-
-    else:
-        items = []
-        order = {'get_cart_total': 0, 'get_cart_items': 0, "shipping": False}
-        cartItems = order['get_cart_items']
+    data = cartData(request)
+    cartItems = data['cartItems']
+    order = data['order']
+    items = data['items']
 
     context = {'items': items, 'order': order, 'cartItems': cartItems}
     return render(request, 'checkout.html', context)
+
 
 def updateItem(request):
     data = json.loads(request.body)
@@ -106,6 +86,7 @@ def updateItem(request):
     if orderItem.quantity <= 0:
         orderItem.delete()
     return JsonResponse('Item was added', safe=False)
+
 
 def signup(request):
     if request.method == 'POST':
@@ -131,34 +112,37 @@ def processOrder(request):
     if request.user.is_authenticated:
         customer = request.user.customer
         order, created = Order.objects.get_or_create(customer=customer, complete=False)
-        total = float(data['form']['total'])
-        order.transaction_id = transaction_id
-
-        if total == order.get_cart_total:
-            order.complete = True
-        order.save()
-
-        if order.shipping == True:
-            ShippingAddress.objects.create(
-                customer=customer,
-                order=order,
-                streetaddress=data['shipping']['streetAddress'],
-                apartmentaddress=data['shipping']['apartmentAddress'],
-                town=data['shipping']['town'],
-                state=data['shipping']['state'],
-                zipcode=data['shipping']['zipcode'],
-            )
 
     else:
-        print('User is not logged in..')
+        customer, order = guestOrder(request, data)
+
+    total = float(data['form']['total'])
+    order.transaction_id = transaction_id
+
+    if total == float(order.get_cart_total):
+        order.complete = True
+    order.save()
+
+    if order.shipping == True:
+        ShippingAddress.objects.create(
+            customer=customer,
+            order=order,
+            streetaddress=data['shipping']['streetAddress'],
+            apartmentaddress=data['shipping']['apartmentAddress'],
+            town=data['shipping']['town'],
+            state=data['shipping']['state'],
+            zipcode=data['shipping']['zipcode'],
+        )
+        #customer, order = guestOrder(request, data)
+
     return JsonResponse('Payment submitted..', safe=False)
+
 
 def user_log(request):
 
     if request.method == 'POST':
         username = request.POST.get('username')
         password = request.POST.get('password')
-
         user = authenticate(request, username=username, password=password)
 
         if user is not None:
@@ -168,3 +152,14 @@ def user_log(request):
             messages.info(request, 'Username or password is incorrect')
 
     return render(request, 'registration/login.html')
+
+
+def subscriber(request):
+    if request.method == 'POST':
+        email = request.POST.get('email', False)
+        sub = Subscriber(email=email)
+        sub.save()
+        return redirect('/')
+    else:
+        return render(request, 'index.html')
+
